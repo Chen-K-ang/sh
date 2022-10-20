@@ -71,7 +71,7 @@ static constexpr uint16_t DIR_WRITE = 0x80;
 
 static constexpr uint16_t Product_identification = 0x4056;
 
-static constexpr uint32_t SAMPLE_INTERVAL_US = 500; // 2000 Hz
+static constexpr uint32_t SAMPLE_INTERVAL_US = 1000; // 1000 Hz
 
 enum class Register : uint16_t {
 	DIAG_STAT      = 0x02,

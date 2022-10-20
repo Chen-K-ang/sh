@@ -41,8 +41,12 @@
 
 #include <lib/mathlib/mathlib.h>
 #include <matrix/matrix/math.hpp>
+#include <uORB/Subscription.hpp>
 #include <uORB/topics/vehicle_attitude_setpoint.h>
 #include <uORB/topics/vehicle_local_position_setpoint.h>
+#include <uORB/topics/manual_control_setpoint.h>
+
+#include <systemlib/mavlink_log.h>
 
 struct PositionControlStates {
 	matrix::Vector3f position;
@@ -148,7 +152,7 @@ public:
 	 * @param dt time in seconds since last iteration
 	 * @return true if update succeeded and output setpoint is executable, false if not
 	 */
-	bool update(const float dt);
+	bool update(const float dt, const bool land);
 
 	/**
 	 * Set the integral term in xy to 0.
@@ -176,7 +180,7 @@ private:
 	bool _updateSuccessful();
 
 	void _positionControl(); ///< Position proportional control
-	void _velocityControl(const float dt); ///< Velocity PID control
+	void _velocityControl(const float dt, const bool land); ///< Velocity PID control
 	void _accelerationControl(); ///< Acceleration setpoint processing
 
 	// Gains
@@ -207,6 +211,9 @@ private:
 	matrix::Vector3f _vel_sp; /**< desired velocity */
 	matrix::Vector3f _acc_sp; /**< desired acceleration */
 	matrix::Vector3f _thr_sp; /**< desired thrust */
+	float _thr_sp_last{0};
 	float _yaw_sp{}; /**< desired heading */
 	float _yawspeed_sp{}; /** desired yaw-speed */
+
+	orb_advert_t _mavlink_log_pub{nullptr};
 };

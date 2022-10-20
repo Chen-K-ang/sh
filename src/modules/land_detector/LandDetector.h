@@ -190,6 +190,10 @@ private:
 		(ParamInt<px4::params::LND_FLIGHT_T_HI>) _param_total_flight_time_high,
 		(ParamInt<px4::params::LND_FLIGHT_T_LO>) _param_total_flight_time_low
 	);
+
+	uint8_t				_land_counter{0};
+	uint8_t				_takeoff_counter{0};
+	bool				_land_detected_by_button{true};
 };
 
 } // namespace land_detector

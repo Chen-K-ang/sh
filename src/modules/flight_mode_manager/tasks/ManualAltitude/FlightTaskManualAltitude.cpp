@@ -365,7 +365,9 @@ void FlightTaskManualAltitude::_updateSetpoints()
 bool FlightTaskManualAltitude::_checkTakeoff()
 {
 	// stick is deflected above 65% throttle (throttle stick is in the range [-1,1])
-	return _sticks.getPosition()(2) < -0.3f;
+	 return _sticks.getPosition()(2) < 0.0f; // -0.3f
+	// stick is deflected above throttle param (throttle stick is in the range [-1,1])
+	//return _sticks.getPosition()(2) < -2.0f * _param_mpc_thr_hover.get() + 1.0f;
 }
 
 bool FlightTaskManualAltitude::update()

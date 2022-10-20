@@ -186,3 +186,18 @@ CONFIG:
       buildType: MinSizeRel
       settings:
         CONFIG: nxp_fmuk66-v3_default
+    nfcy_f2_default:
+      short: nfcy_f2
+      buildType: MinSizeRel
+      settings:
+        CONFIG: nfcy_f2_default
+    nfcy_f3_default:
+      short: nfcy_f3
+      buildType: MinSizeRel
+      settings:
+        CONFIG: nfcy_f3_default
+    nfcy_f4_default:
+      short: nfcy_f4
+      buildType: MinSizeRel
+      settings:
+        CONFIG: nfcy_f4_default

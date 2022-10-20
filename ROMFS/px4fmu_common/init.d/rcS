@@ -428,7 +428,8 @@ else
 	if [ $IO_PRESENT = no ]
 	then
 		# Must be started after the serial config is read
-		rc_input start $RC_INPUT_ARGS
+		# rc_input start $RC_INPUT_ARGS
+		rc_input start -d /dev/ttyS4
 	fi
 
 	#

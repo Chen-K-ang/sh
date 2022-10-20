@@ -62,6 +62,7 @@
 #include <uORB/topics/gps_dump.h>
 #include <uORB/topics/gps_inject_data.h>
 #include <uORB/topics/sensor_gps.h>
+#include <systemlib/mavlink_log.h>
 
 #ifndef CONSTRAINED_FLASH
 # include "devices/src/ashtech.h"
@@ -1060,7 +1061,17 @@ GPS::publish()
 	if (_instance == Instance::Main || _is_gps_main_advertised.load()) {
 		_report_gps_pos.device_id = get_device_id();
 
+		//orb_advert_t _mavlink_log_pub{nullptr};
+
 		_report_gps_pos_pub.publish(_report_gps_pos);
+		/*if(PX4_ISFINITE(_report_gps_pos.heading)){
+			float gps_heading = _report_gps_pos.heading * 57.3f;
+			if(gps_heading < 0){
+				gps_heading += 360.0f;
+			}
+			mavlink_log_info(&_mavlink_log_pub,"heading: %f", (double)gps_heading); 
+		}*/
+		
 		// Heading/yaw data can be updated at a lower rate than the other navigation data.
 		// The uORB message definition requires this data to be set to a NAN if no new valid data is available.
 		_report_gps_pos.heading = NAN;

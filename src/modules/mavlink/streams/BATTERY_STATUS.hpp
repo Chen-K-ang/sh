@@ -35,6 +35,11 @@
 #define BATTERY_STATUS_HPP
 
 #include <uORB/topics/battery_status.h>
+/************************************************/
+#include <uORB/topics/rpm.h>
+#include <uORB/topics/system_power.h>
+#include <uORB/topics/actuator_controls.h>
+/************************************************/
 
 class MavlinkStreamBatteryStatus : public MavlinkStream
 {
@@ -58,90 +63,80 @@ private:
 
 	uORB::SubscriptionMultiArray<battery_status_s, battery_status_s::MAX_INSTANCES> _battery_status_subs{ORB_ID::battery_status};
 
+/****************************************************************************/
+	uORB::Subscription _rpm_sub{ORB_ID(rpm)};
+	uORB::Subscription _actuator_controls_2_sub{ORB_ID(actuator_controls_2)};
+	uORB::Subscription _system_power_sub{ORB_ID(system_power)};
+/****************************************************************************/
+
 	bool send() override
 	{
-		bool updated = false;
+		/* battery status message with higher resolution */
+		mavlink_battery_status_t bat_msg{};
+		// TODO: Determine how to better map between battery ID within the firmware and in MAVLink
+		bat_msg.time_remaining = (int32_t)NAN;
+		bat_msg.temperature = (int16_t)NAN;
+		bat_msg.id = 0;
+		bat_msg.battery_function = MAV_BATTERY_FUNCTION_ALL;
+		bat_msg.type = MAV_BATTERY_TYPE_LIPO;
+		bat_msg.current_consumed = -1;
+		bat_msg.energy_consumed = -1;
+		bat_msg.current_battery = -1;
+		bat_msg.battery_remaining = -1;
+		bat_msg.charge_state = MAV_BATTERY_CHARGE_STATE_OK;
 
-		for (auto &battery_sub : _battery_status_subs) {
-			battery_status_s battery_status;
-
-			if (battery_sub.update(&battery_status)) {
-				/* battery status message with higher resolution */
-				mavlink_battery_status_t bat_msg{};
-				// TODO: Determine how to better map between battery ID within the firmware and in MAVLink
-				bat_msg.id = battery_status.id - 1;
-				bat_msg.battery_function = MAV_BATTERY_FUNCTION_ALL;
-				bat_msg.type = MAV_BATTERY_TYPE_LIPO;
-				bat_msg.current_consumed = (battery_status.connected) ? battery_status.discharged_mah : -1;
-				bat_msg.energy_consumed = -1;
-				bat_msg.current_battery = (battery_status.connected) ? battery_status.current_filtered_a * 100 : -1;
-				bat_msg.battery_remaining = (battery_status.connected) ? ceilf(battery_status.remaining * 100.f) : -1;
-				bat_msg.time_remaining = (battery_status.connected) ? battery_status.run_time_to_empty * 60 : 0;
-
-				switch (battery_status.warning) {
-				case (battery_status_s::BATTERY_WARNING_NONE):
-					bat_msg.charge_state = MAV_BATTERY_CHARGE_STATE_OK;
-					break;
-
-				case (battery_status_s::BATTERY_WARNING_LOW):
-					bat_msg.charge_state = MAV_BATTERY_CHARGE_STATE_LOW;
-					break;
-
-				case (battery_status_s::BATTERY_WARNING_CRITICAL):
-					bat_msg.charge_state = MAV_BATTERY_CHARGE_STATE_CRITICAL;
-					break;
-
-				case (battery_status_s::BATTERY_WARNING_EMERGENCY):
-					bat_msg.charge_state = MAV_BATTERY_CHARGE_STATE_EMERGENCY;
-					break;
-
-				case (battery_status_s::BATTERY_WARNING_FAILED):
-					bat_msg.charge_state = MAV_BATTERY_CHARGE_STATE_FAILED;
-					break;
-
-				default:
-					bat_msg.charge_state = MAV_BATTERY_CHARGE_STATE_UNDEFINED;
-					break;
-				}
-
-				// check if temperature valid
-				if (battery_status.connected && PX4_ISFINITE(battery_status.temperature)) {
-					bat_msg.temperature = battery_status.temperature * 100.f;
-
-				} else {
-					bat_msg.temperature = INT16_MAX;
-				}
-
-				static constexpr int mavlink_cells_max = (sizeof(bat_msg.voltages) / sizeof(bat_msg.voltages[0]));
-				static constexpr int uorb_cells_max =
-					(sizeof(battery_status.voltage_cell_v) / sizeof(battery_status.voltage_cell_v[0]));
-
-				for (int cell = 0; cell < mavlink_cells_max; cell++) {
-					if (battery_status.connected && (cell < battery_status.cell_count) && (cell < uorb_cells_max)) {
-						bat_msg.voltages[cell] = battery_status.voltage_cell_v[cell] * 1000.f;
-
-					} else {
-						bat_msg.voltages[cell] = UINT16_MAX;
-					}
-				}
-
-				static constexpr int mavlink_cells_ext_max = (sizeof(bat_msg.voltages_ext) / sizeof(bat_msg.voltages_ext[0]));
-
-				for (int cell = mavlink_cells_max; cell < mavlink_cells_max + mavlink_cells_ext_max; cell++) {
-					if (battery_status.connected && (cell < battery_status.cell_count) && (cell < uorb_cells_max)) {
-						bat_msg.voltages_ext[cell - mavlink_cells_max] = battery_status.voltage_cell_v[cell] * 1000.0f;
-
-					} else {
-						bat_msg.voltages_ext[cell - mavlink_cells_max] = UINT16_MAX;
-					}
-				}
-
-				mavlink_msg_battery_status_send_struct(_mavlink->get_channel(), &bat_msg);
-				updated = true;
-			}
+		static constexpr int mavlink_cells_max = (sizeof(bat_msg.voltages) / sizeof(bat_msg.voltages[0]));
+			
+		for (int cell = 0; cell < mavlink_cells_max; cell++) {
+			
+			bat_msg.voltages[cell] = UINT16_MAX;
+			
 		}
 
-		return updated;
+		static constexpr int mavlink_cells_ext_max = (sizeof(bat_msg.voltages_ext) / sizeof(bat_msg.voltages_ext[0]));
+
+		for (int cell = mavlink_cells_max; cell < mavlink_cells_max + mavlink_cells_ext_max; cell++) {
+			
+			bat_msg.voltages_ext[cell - mavlink_cells_max] = UINT16_MAX;
+			
+		}
+
+		bool _is_rpm_updated = false;
+		bool _is_sys_pw_updated = false;
+
+		rpm_s engine_rpm{};
+		_rpm_sub.copy(&engine_rpm);
+
+		if (engine_rpm.timestamp > 0) {
+
+			bat_msg.time_remaining = (int32_t)engine_rpm.indicated_frequency_rpm;
+			_is_rpm_updated = true;
+
+		}
+
+		system_power_s sys_pow{};
+
+		if (_system_power_sub.update(&sys_pow)) {
+			
+			bat_msg.temperature = (int16_t)(sys_pow.sensors3v3[0]*100);
+			_is_sys_pw_updated = true;
+		}
+/***************************************************************************************/
+		actuator_controls_s  _actuator_controls_2{0};
+		_actuator_controls_2_sub.copy(&_actuator_controls_2);
+		bat_msg.current_consumed = (_actuator_controls_2.control[6] + 1) / 2 * 100;
+/***************************************************************************************/
+
+		bool syspw_timeout = (hrt_elapsed_time(&sys_pow.timestamp) > 50_ms);
+
+		if (_is_sys_pw_updated || (_is_rpm_updated && syspw_timeout)) {
+
+			mavlink_msg_battery_status_send_struct(_mavlink->get_channel(), &bat_msg);
+
+			return true;
+		}
+		
+		return false;
 	}
 };
 

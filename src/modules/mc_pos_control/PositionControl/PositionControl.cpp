@@ -88,7 +88,7 @@ void PositionControl::setInputSetpoint(const vehicle_local_position_setpoint_s &
 	_yawspeed_sp = setpoint.yawspeed;
 }
 
-bool PositionControl::update(const float dt)
+bool PositionControl::update(const float dt, const bool land)
 {
 	// x and y input setpoints always have to come in pairs
 	const bool valid = (PX4_ISFINITE(_pos_sp(0)) == PX4_ISFINITE(_pos_sp(1)))
@@ -96,7 +96,18 @@ bool PositionControl::update(const float dt)
 			   && (PX4_ISFINITE(_acc_sp(0)) == PX4_ISFINITE(_acc_sp(1)));
 
 	_positionControl();
-	_velocityControl(dt);
+	_velocityControl(dt, land);
+	if(PX4_ISFINITE(_thr_sp(2))){
+		float _det_thr = _thr_sp(2) - _thr_sp_last;
+		if(_det_thr >= 0){
+			_det_thr = math::min(_det_thr, 0.10f * dt);
+		}else{
+			_det_thr = math::max(_det_thr, -0.15f * dt);
+		}
+		_thr_sp(2) = _thr_sp_last + _det_thr;
+		_thr_sp_last = _thr_sp(2);
+	}
+
 
 	_yawspeed_sp = PX4_ISFINITE(_yawspeed_sp) ? _yawspeed_sp : 0.f;
 	_yaw_sp = PX4_ISFINITE(_yaw_sp) ? _yaw_sp : _yaw; // TODO: better way to disable yaw control
@@ -112,7 +123,7 @@ void PositionControl::_positionControl()
 	ControlMath::addIfNotNanVector3f(_vel_sp, vel_sp_position);
 	// make sure there are no NAN elements for further reference while constraining
 	ControlMath::setZeroIfNanVector3f(vel_sp_position);
-
+	
 	// Constrain horizontal velocity by prioritizing the velocity component along the
 	// the desired position setpoint over the feed-forward term.
 	_vel_sp.xy() = ControlMath::constrainXY(vel_sp_position.xy(), (_vel_sp - vel_sp_position).xy(), _lim_vel_horizontal);
@@ -120,7 +131,7 @@ void PositionControl::_positionControl()
 	_vel_sp(2) = math::constrain(_vel_sp(2), -_lim_vel_up, _lim_vel_down);
 }
 
-void PositionControl::_velocityControl(const float dt)
+void PositionControl::_velocityControl(const float dt, const bool land)
 {
 	// PID velocity control
 	Vector3f vel_error = _vel_sp - _vel;

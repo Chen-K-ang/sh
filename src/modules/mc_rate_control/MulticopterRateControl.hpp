@@ -59,6 +59,11 @@
 #include <uORB/topics/vehicle_land_detected.h>
 #include <uORB/topics/vehicle_rates_setpoint.h>
 #include <uORB/topics/vehicle_status.h>
+#include <uORB/topics/vehicle_local_position_setpoint.h>
+#include <uORB/topics/vehicle_attitude.h>
+#include <uORB/topics/vehicle_attitude_setpoint.h>
+
+#include <systemlib/mavlink_log.h>
 
 using namespace time_literals;
 
@@ -98,6 +103,10 @@ private:
 	uORB::Subscription _vehicle_angular_acceleration_sub{ORB_ID(vehicle_angular_acceleration)};
 	uORB::Subscription _vehicle_land_detected_sub{ORB_ID(vehicle_land_detected)};
 	uORB::Subscription _vehicle_status_sub{ORB_ID(vehicle_status)};
+	uORB::Subscription _vehicle_local_position_setpoint_sub{ORB_ID(vehicle_local_position_setpoint)};
+	uORB::Subscription _vehicle_attitude_sub{ORB_ID(vehicle_attitude)};
+	uORB::Subscription _vehicle_attitude_setpoint_sub{ORB_ID(vehicle_attitude_setpoint)};
+
 
 	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
 
@@ -109,7 +118,16 @@ private:
 
 	vehicle_control_mode_s		_v_control_mode{};
 	vehicle_status_s		_vehicle_status{};
+	vehicle_local_position_setpoint_s     _vehicle_lps_sp{};
+	vehicle_attitude_s              _vehicle_att{};
+	vehicle_attitude_setpoint_s     _vehicle_att_sp{};
+	float                           _yaw{0};
 
+	manual_control_setpoint_s       _manual_control_setpoint_test{0};
+
+	float direct_pitch{0};
+	float direct_roll{0};
+	uint16_t count{0};
 	bool _actuators_0_circuit_breaker_enabled{false};	/**< circuit breaker to suppress output */
 	bool _landed{true};
 	bool _maybe_landed{true};
@@ -121,10 +139,13 @@ private:
 	matrix::Vector3f _rates_sp;			/**< angular rates setpoint */
 
 	float		_thrust_sp{0.0f};		/**< thrust setpoint */
+	float 		_param_roll_trim{0.0f};
 
 	hrt_abstime _last_run{0};
 
 	int8_t _landing_gear{landing_gear_s::GEAR_DOWN};
+
+	orb_advert_t _mavlink_log_pub{nullptr};
 
 	DEFINE_PARAMETERS(
 		(ParamFloat<px4::params::MC_ROLLRATE_P>) _param_mc_rollrate_p,

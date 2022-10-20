@@ -104,7 +104,7 @@ RCInput::init()
 	// so that if Single wire mode on TX there will be only
 	// a short contention
 	sbus_config(_rcs_fd, board_rc_singlewire(_device));
-
+	rc_io_invert(true);
 #ifdef GPIO_PPM_IN
 	// disable CPPM input by mapping it away from the timer capture input
 	px4_arch_unconfiggpio(GPIO_PPM_IN);
@@ -252,11 +252,11 @@ void RCInput::rc_io_invert(bool invert)
 {
 	// First check if the board provides a board-specific inversion method (e.g. via GPIO),
 	// and if not use an IOCTL
-	if (!board_rc_invert_input(_device, invert)) {
-#if defined(TIOCSINVERT)
+	//if (!board_rc_invert_input(_device, invert)) {
+//#if defined(TIOCSINVERT)
 		ioctl(_rcs_fd, TIOCSINVERT, invert ? (SER_INVERT_ENABLED_RX | SER_INVERT_ENABLED_TX) : 0);
-#endif // TIOCSINVERT
-	}
+//#endif // TIOCSINVERT
+	//}
 }
 
 void RCInput::Run()
@@ -406,8 +406,8 @@ void RCInput::Run()
 		if (newBytes > 0) {
 			_bytes_rx += newBytes;
 		}
-
-		switch (_rc_scan_state) {
+		_rc_scan_state = RC_SCAN_SBUS;
+		switch (_rc_scan_state) {  
 		case RC_SCAN_SBUS:
 			if (_rc_scan_begin == 0) {
 				_rc_scan_begin = cycle_timestamp;

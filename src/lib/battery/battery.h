@@ -54,7 +54,10 @@
 #include <lib/parameters/param.h>
 #include <lib/ecl/AlphaFilter/AlphaFilter.hpp>
 #include <uORB/PublicationMulti.hpp>
+#include <uORB/Subscription.hpp>
 #include <uORB/topics/battery_status.h>
+#include <uORB/topics/rpm.h>
+#include <uORB/topics/actuator_controls.h>
 
 /**
  * BatteryBase is a base class for any type of battery.
@@ -188,7 +191,12 @@ private:
 	uint8_t determineWarning(float state_of_charge);
 	void computeScale();
 
+	uORB::Subscription _actuator_controls_2_sub{ORB_ID(actuator_controls_2)};
+	uORB::Subscription _rpm_sub{ORB_ID(rpm)};
 	uORB::PublicationMulti<battery_status_s> _battery_status_pub{ORB_ID(battery_status)};
+
+	rpm_s _rpm{0};
+	actuator_controls_s ac_sub{0};
 
 	bool _battery_initialized{false};
 	AlphaFilter<float> _voltage_filter_v;

@@ -131,9 +131,16 @@ void Battery::updateBatteryStatus(const hrt_abstime &timestamp, float voltage_v,
 	}
 
 	battery_status_s battery_status{};
-	battery_status.voltage_v = voltage_v;
+
+	_rpm_sub.copy(&_rpm);
+	_actuator_controls_2_sub.copy(&ac_sub);
+
+	battery_status.voltage_v = _rpm.indicated_frequency_rpm;
+	battery_status.current_a = ac_sub.control[6] * 1000;
+
+	// battery_status.voltage_v = voltage_v;
 	battery_status.voltage_filtered_v = _voltage_filter_v.getState();
-	battery_status.current_a = current_a;
+	// battery_status.current_a = current_a;
 	battery_status.current_filtered_a = _current_filter_a.getState();
 	battery_status.current_average_a = -1.f; // support will follow
 	battery_status.discharged_mah = _discharged_mah;

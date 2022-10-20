@@ -119,11 +119,46 @@ void LandDetector::Run()
 	_ground_effect_hysteresis.set_state_and_update(_get_ground_effect_state(), now_us);
 
 	const bool freefallDetected = _freefall_hysteresis.get_state();
-	const bool ground_contactDetected = _ground_contact_hysteresis.get_state();
-	const bool maybe_landedDetected = _maybe_landed_hysteresis.get_state();
-	const bool landDetected = _landed_hysteresis.get_state();
+	bool ground_contactDetected = _ground_contact_hysteresis.get_state();
+	bool maybe_landedDetected = _maybe_landed_hysteresis.get_state();
+	bool landDetected = _landed_hysteresis.get_state();
 	const float alt_max = _get_max_altitude() > 0.0f ? _get_max_altitude() : (float)INFINITY;
-	const bool in_ground_effect = _ground_effect_hysteresis.get_state();
+	bool in_ground_effect = _ground_effect_hysteresis.get_state();
+
+	const bool landing_button_pressed = !px4_arch_gpioread(GPIO_LANDING_DETECT); 
+	//低电平(false) land(通)        高电平(ture) takeoff(断)
+		//land                            takeoff
+	if(landing_button_pressed){
+
+		if(_land_counter < 10){
+
+			_land_counter++;
+
+		}else{
+
+			_land_detected_by_button = true;
+		}
+
+		_takeoff_counter = 0;
+
+	}else{
+
+		if(_takeoff_counter < 7){
+
+			_takeoff_counter++;
+
+		}else{
+
+			_land_detected_by_button = false;
+		}
+
+		_land_counter = 0;
+	}
+
+	ground_contactDetected = _land_detected_by_button;
+	maybe_landedDetected = _land_detected_by_button;
+	landDetected = _land_detected_by_button;
+	in_ground_effect = _land_detected_by_button;
 
 	// publish at 1 Hz, very first time, or when the result has changed
 	if ((hrt_elapsed_time(&_land_detected.timestamp) >= 1_s) ||

@@ -51,6 +51,9 @@
 #include <uORB/topics/rpm.h>
 #include <drivers/drv_hrt.h>
 
+#include <systemlib/mavlink_log.h>
+
+
 /* Configuration Constants */
 #define PCF8583_BASEADDR_DEFAULT             0x50
 
@@ -73,16 +76,28 @@ private:
 
 	int  probe() override;
 
+	void           initCounter();
 	int            getCounter();
 	void           resetCounter();
 
 	uint8_t        readRegister(uint8_t reg);
 	void           setRegister(uint8_t reg, uint8_t value);
 
-	int            _count{0};
+	uint8_t        hiWord(uint8_t in) { return (in & 0x0fu); }
+	uint8_t        loWord(uint8_t in) { return ((in & 0xf0u) >> 4); }
+
+	uint32_t       _count{0};
+	uint16_t       _reset_count{0};
 	hrt_abstime    _last_measurement_time{0};
+	hrt_abstime    _last_reset_time{0};
+	int            _tranfer_fail_count{0};
+	uint8_t        _last_config_register_content{0x00};
+	float          _rpm_last{0};
+	int            diffCount_old{0};
+    uint8_t        _diff_counter{0};
 
 	uORB::Publication<rpm_s> _rpm_pub{ORB_ID(rpm)};
+	orb_advert_t _mavlink_log_pub{nullptr};
 
 	DEFINE_PARAMETERS(
 		(ParamInt<px4::params::PCF8583_ADDR>) _param_pcf8583_addr,

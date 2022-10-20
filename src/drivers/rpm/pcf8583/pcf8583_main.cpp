@@ -62,6 +62,7 @@ I2CSPIDriverBase *PCF8583::instantiate(const BusCLIArguments &cli, const BusInst
 
 	return instance;
 }
+
 extern "C" __EXPORT int pcf8583_main(int argc, char *argv[])
 {
 	using ThisDriver = PCF8583;

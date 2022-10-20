@@ -233,7 +233,8 @@ void ADC::update_system_power(hrt_abstime now)
 			break;
 		}
 	}
-
+	system_power.sensors3v3[0] = _samples[3].am_data * (ADC_3V3_SCALE * (3.3f / px4_arch_adc_dn_fullcount())) * 51.2f;
+	// mavlink_log_info(&_mavlink_log_pub,"temperature: %.3f", (double)system_power.sensors3v3[0]);
 	/* Note once the board_config.h provides BOARD_ADC_USB_CONNECTED,
 	 * It must provide the true logic GPIO BOARD_ADC_xxxx macros.
 	 */

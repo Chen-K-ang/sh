@@ -213,7 +213,11 @@ MulticopterAttitudeControl::generate_attitude_setpoint(const Quatf &q, float dt,
 
 	attitude_setpoint.thrust_body[2] = -throttle_curve(math::constrain(_manual_control_setpoint.z, 0.0f, 1.0f));
 	attitude_setpoint.timestamp = hrt_absolute_time();
-
+/******************************************************************************/
+			// if (fabs(attitude_setpoint.yaw_body) > 0.0f){
+			// 	attitude_setpoint.thrust_body[2] = attitude_setpoint.thrust_body[2] + (0.5f * fabs(attitude_setpoint.yaw_body));
+			// }
+/******************************************************************************/
 	_vehicle_attitude_setpoint_pub.publish(attitude_setpoint);
 }
 
@@ -243,10 +247,16 @@ MulticopterAttitudeControl::Run()
 
 	if (_vehicle_attitude_sub.update(&v_att)) {
 
+		_v_control_mode_sub.update(&_v_control_mode);
 		// Check for new attitude setpoint
 		if (_vehicle_attitude_setpoint_sub.updated()) {
 			vehicle_attitude_setpoint_s vehicle_attitude_setpoint;
 			_vehicle_attitude_setpoint_sub.update(&vehicle_attitude_setpoint);
+
+			if(_v_control_mode.flag_control_position_enabled || _v_control_mode.flag_control_auto_enabled){
+				Quatf q_0 = Eulerf(vehicle_attitude_setpoint.roll_body, 0, vehicle_attitude_setpoint.yaw_body);
+				q_0.copyTo(vehicle_attitude_setpoint.q_d);
+			}
 			_attitude_control.setAttitudeSetpoint(Quatf(vehicle_attitude_setpoint.q_d), vehicle_attitude_setpoint.yaw_sp_move_rate);
 			_thrust_setpoint_body = Vector3f(vehicle_attitude_setpoint.thrust_body);
 		}
@@ -267,7 +277,7 @@ MulticopterAttitudeControl::Run()
 
 		/* check for updates in other topics */
 		_manual_control_setpoint_sub.update(&_manual_control_setpoint);
-		_v_control_mode_sub.update(&_v_control_mode);
+		
 
 		if (_vehicle_land_detected_sub.updated()) {
 			vehicle_land_detected_s vehicle_land_detected;

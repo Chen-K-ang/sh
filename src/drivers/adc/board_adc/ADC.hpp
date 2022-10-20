@@ -53,6 +53,8 @@
 #include <uORB/topics/adc_report.h>
 #include <uORB/topics/system_power.h>
 
+// #include <systemlib/mavlink_log.h>
+
 using namespace time_literals;
 
 #ifndef ADC_CHANNELS
@@ -108,6 +110,7 @@ private:
 	const uint32_t			_base_address;
 	px4_adc_msg_t			*_samples{nullptr};	/**< sample buffer */
 
+	// orb_advert_t 			_mavlink_log_pub{nullptr};
 	uORB::Publication<adc_report_s>		_to_adc_report{ORB_ID(adc_report)};
 	uORB::Publication<system_power_s>	_to_system_power{ORB_ID(system_power)};
 #ifdef BOARD_GPIO_VDD_5V_COMP_VALID

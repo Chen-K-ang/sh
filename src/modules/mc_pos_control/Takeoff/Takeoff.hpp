@@ -87,7 +87,7 @@ public:
 	 * @param takeoff_desired_vz end value for the velocity ramp
 	 * @return true if setpoint has updated correctly
 	 */
-	float updateRamp(const float dt, const float takeoff_desired_vz);
+	float updateRamp(const float dt, const float takeoff_desired_vz, const bool landed);
 
 	TakeoffState getTakeoffState() { return _takeoff_state; }
 

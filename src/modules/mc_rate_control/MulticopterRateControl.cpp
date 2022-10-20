@@ -78,16 +78,27 @@ MulticopterRateControl::parameters_updated()
 	const Vector3f rate_k = Vector3f(_param_mc_rollrate_k.get(), _param_mc_pitchrate_k.get(), _param_mc_yawrate_k.get());
 
 	_rate_control.setGains(
+		//Set the rate control gains
+		//@param P 3D vector of proportional gains for body x,y,z axis
+	 	//@param I 3D vector of integral gains
+		//@param D 3D vector of derivative gains
+		// roll x[0]		pitch y[1]    	   yaw z[2]
 		rate_k.emult(Vector3f(_param_mc_rollrate_p.get(), _param_mc_pitchrate_p.get(), _param_mc_yawrate_p.get())),
 		rate_k.emult(Vector3f(_param_mc_rollrate_i.get(), _param_mc_pitchrate_i.get(), _param_mc_yawrate_i.get())),
 		rate_k.emult(Vector3f(_param_mc_rollrate_d.get(), _param_mc_pitchrate_d.get(), _param_mc_yawrate_d.get())));
 
 	_rate_control.setIntegratorLimit(
+		// Set the mximum absolute value of the integrator for all axes
+		// @param integrator_limit limit value for all axes x, y, z
 		Vector3f(_param_mc_rr_int_lim.get(), _param_mc_pr_int_lim.get(), _param_mc_yr_int_lim.get()));
 
 	_rate_control.setFeedForwardGain(
-		Vector3f(_param_mc_rollrate_ff.get(), _param_mc_pitchrate_ff.get(), _param_mc_yawrate_ff.get()));
-
+		//Set direct rate to torque feed forward gain
+		//@see _gain_ff
+	 	//@param FF 3D vector of feed forward gains for body x,y,z axis
+		Vector3f(.0f, .0f, .0f));
+			//_param_mc_rollrate_ff.get(), _param_mc_pitchrate_ff.get() , _param_mc_yawrate_ff.get(), 
+	_param_roll_trim = _param_mc_rollrate_ff.get();
 
 	// manual rate control acro mode rate limits
 	_acro_rate_max = Vector3f(radians(_param_mc_acro_r_max.get()), radians(_param_mc_acro_p_max.get()),
@@ -117,6 +128,10 @@ MulticopterRateControl::Run()
 		parameters_updated();
 	}
 
+	if(_manual_control_setpoint_sub.updated()){
+		_manual_control_setpoint_sub.copy(&_manual_control_setpoint_test);
+		//update(&);
+	}
 	/* run controller on gyro changes */
 	vehicle_angular_velocity_s angular_velocity;
 
@@ -186,17 +201,23 @@ MulticopterRateControl::Run()
 				_v_rates_sp_pub.publish(v_rates_sp);
 			}
 
+
 		} else {
+
 			// use rates setpoint topic
-			vehicle_rates_setpoint_s v_rates_sp;
+			vehicle_rates_setpoint_s  v_rates_sp{};
 
 			if (_v_rates_sp_sub.update(&v_rates_sp)) {
 				_rates_sp(0) = PX4_ISFINITE(v_rates_sp.roll)  ? v_rates_sp.roll  : rates(0);
 				_rates_sp(1) = PX4_ISFINITE(v_rates_sp.pitch) ? v_rates_sp.pitch : rates(1);
-				_rates_sp(2) = PX4_ISFINITE(v_rates_sp.yaw)   ? v_rates_sp.yaw   : rates(2);
+				_rates_sp(2) = PX4_ISFINITE(v_rates_sp.yaw) ? v_rates_sp.yaw   : rates(2);
 				_thrust_sp = -v_rates_sp.thrust_body[2];
-			}
+			}	
 		}
+
+		//if(_manual_control_setpoint_test.aux1 > 0.25f){
+		//	_thrust_sp = math::constrain(_manual_control_setpoint_test.z, 0.0f, 1.0f);
+		//}
 
 		// run the rate controller
 		if (_v_control_mode.flag_control_rates_enabled && !_actuators_0_circuit_breaker_enabled) {
@@ -218,22 +239,58 @@ MulticopterRateControl::Run()
 				}
 			}
 
+			if(_v_control_mode.flag_control_position_enabled || _v_control_mode.flag_control_auto_enabled){
+
+				if(_vehicle_local_position_setpoint_sub.update(&_vehicle_lps_sp)){
+
+					if(_vehicle_attitude_sub.updated()){
+						_vehicle_attitude_sub.copy(&_vehicle_att);
+						Quatf Q(_vehicle_att.q);
+						_yaw = Eulerf(Q).psi();
+					}
+					
+					if(PX4_ISFINITE(_vehicle_lps_sp.thrust[0]) && PX4_ISFINITE(_vehicle_lps_sp.thrust[1])){
+						//float acc_n = _vehicle_lps_sp.acceleration[0] / 6.0f;
+						//float acc_e = _vehicle_lps_sp.acceleration[1] / 6.0f;
+
+						direct_pitch = _vehicle_lps_sp.thrust[0] * cosf(_yaw) + _vehicle_lps_sp.thrust[1] * sinf(_yaw);
+					}else{
+						direct_pitch = 0;
+					}
+					//direct_pitch = -2.5f * _vehicle_lps_sp.thrust[1];
+					direct_pitch = 4.5f * direct_pitch;
+				}
+			}else{
+				direct_pitch = 0;
+			}
+						
 			// run rate controller
 			const Vector3f att_control = _rate_control.update(rates, _rates_sp, angular_accel, dt, _maybe_landed || _landed);
 
+			 // if(count < 400){
+			 // 	count++;
+			 // }else{
+			 // 	mavlink_log_info(&_mavlink_log_pub,"throttle: %.3f roll: %.3f pitch: %.3f", (double)_thrust_sp, (double)att_control(0), (double)direct_pitch);
+			 // 	count = 0;
+			 // }
+			
 			// publish rate controller status
 			rate_ctrl_status_s rate_ctrl_status{};
 			_rate_control.getRateControlStatus(rate_ctrl_status);
 			rate_ctrl_status.timestamp = hrt_absolute_time();
 			_controller_status_pub.publish(rate_ctrl_status);
-
+			
 			// publish actuator controls
 			actuator_controls_s actuators{};
-			actuators.control[actuator_controls_s::INDEX_ROLL] = PX4_ISFINITE(att_control(0)) ? att_control(0) : 0.0f;
-			actuators.control[actuator_controls_s::INDEX_PITCH] = PX4_ISFINITE(att_control(1)) ? att_control(1) : 0.0f;
+			actuators.control[actuator_controls_s::INDEX_ROLL] = PX4_ISFINITE(math::constrain(att_control(0), -0.75f, 0.75f)) ? (math::constrain(att_control(0), -0.75f, 0.75f) + 0.18f) : 0.0f;
+			//actuators.control[actuator_controls_s::INDEX_PITCH] = PX4_ISFINITE(att_control(1)) ? att_control(1) : 0.0f;
+			//actuators.control[actuator_controls_s::INDEX_ROLL] = PX4_ISFINITE(direct_roll + _param_roll_comp) ? (-direct_roll + _param_roll_comp) : 0.0f;
+			actuators.control[actuator_controls_s::INDEX_PITCH] = PX4_ISFINITE(math::constrain(direct_pitch, -1.0f, 1.0f)) ? -math::constrain(direct_pitch, -1.0f, 1.0f) : 0.0f;
 			actuators.control[actuator_controls_s::INDEX_YAW] = PX4_ISFINITE(att_control(2)) ? att_control(2) : 0.0f;
-			actuators.control[actuator_controls_s::INDEX_THROTTLE] = PX4_ISFINITE(_thrust_sp) ? _thrust_sp : 0.0f;
+			actuators.control[actuator_controls_s::INDEX_THROTTLE] = PX4_ISFINITE(_thrust_sp) ? _thrust_sp : 0.0f;		
+			actuators.control[actuator_controls_s::INDEX_FLAPS] = PX4_ISFINITE(att_control(1)) ? -att_control(1) : 0.0f;
 			actuators.control[actuator_controls_s::INDEX_LANDING_GEAR] = _landing_gear;
+			
 			actuators.timestamp_sample = angular_velocity.timestamp_sample;
 
 			// scale effort by battery status if enabled

@@ -362,14 +362,15 @@ void MulticopterPositionControl::Run()
 
 			const bool not_taken_off = (_takeoff.getTakeoffState() < TakeoffState::rampup);
 			const bool flying = (_takeoff.getTakeoffState() >= TakeoffState::flight);
-			const bool flying_but_ground_contact = (flying && _vehicle_land_detected.ground_contact);
+			//const bool flying_but_ground_contact = (flying && _vehicle_land_detected.ground_contact);
 
 			// make sure takeoff ramp is not amended by acceleration feed-forward
 			if (!flying) {
 				_setpoint.acceleration[2] = NAN;
 			}
 
-			if (not_taken_off || flying_but_ground_contact) {
+			if (not_taken_off) {
+			
 				// we are not flying yet and need to avoid any corrections
 				reset_setpoint_to_nan(_setpoint);
 				Vector3f(0.f, 0.f, 100.f).copyTo(_setpoint.acceleration); // High downwards acceleration to make sure there's no thrust
@@ -383,10 +384,11 @@ void MulticopterPositionControl::Run()
 						     ? _param_mpc_tiltmax_lnd.get() : _param_mpc_tiltmax_air.get();
 			_control.setTiltLimit(_tilt_limit_slew_rate.update(math::radians(tilt_limit_deg), dt));
 
-			const float speed_up = _takeoff.updateRamp(dt,
-					       PX4_ISFINITE(_vehicle_constraints.speed_up) ? _vehicle_constraints.speed_up : _param_mpc_z_vel_max_up.get());
-			const float speed_down = PX4_ISFINITE(_vehicle_constraints.speed_down) ? _vehicle_constraints.speed_down :
-						 _param_mpc_z_vel_max_dn.get();
+			//const float speed_up = _takeoff.updateRamp(dt,
+			//		       PX4_ISFINITE(_vehicle_constraints.speed_up) ? _vehicle_constraints.speed_up : _param_mpc_z_vel_max_up.get());
+			_takeoff.updateRamp(dt,_param_mpc_z_vel_max_up.get(),_vehicle_land_detected.landed);
+			//const float speed_down = PX4_ISFINITE(_vehicle_constraints.speed_down) ? _vehicle_constraints.speed_down :
+			//			 _param_mpc_z_vel_max_dn.get();
 			const float speed_horizontal = PX4_ISFINITE(_vehicle_constraints.speed_xy) ? _vehicle_constraints.speed_xy :
 						       _param_mpc_xy_vel_max.get();
 
@@ -397,13 +399,15 @@ void MulticopterPositionControl::Run()
 
 			_control.setVelocityLimits(
 				math::constrain(speed_horizontal, 0.f, _param_mpc_xy_vel_max.get()),
-				math::min(speed_up, _param_mpc_z_vel_max_up.get()), // takeoff ramp starts with negative velocity limit
-				math::constrain(speed_down, 0.f, _param_mpc_z_vel_max_dn.get()));
+				_param_mpc_z_vel_max_up.get(),
+				_param_mpc_z_vel_max_dn.get());
+				//math::min(speed_up, _param_mpc_z_vel_max_up.get()), // takeoff ramp starts with negative velocity limit
+				//math::constrain(speed_down, 0.f, _param_mpc_z_vel_max_dn.get()));
 
 			_control.setInputSetpoint(_setpoint);
 
 			// update states
-			if (!PX4_ISFINITE(_setpoint.z)
+			if (false && !PX4_ISFINITE(_setpoint.z)
 			    && PX4_ISFINITE(_setpoint.vz) && (fabsf(_setpoint.vz) > FLT_EPSILON)
 			    && PX4_ISFINITE(local_pos.z_deriv) && local_pos.z_valid && local_pos.v_z_valid) {
 				// A change in velocity is demanded and the altitude is not controlled.
@@ -418,7 +422,7 @@ void MulticopterPositionControl::Run()
 			_control.setState(states);
 
 			// Run position control
-			if (_control.update(dt)) {
+			if (_control.update(dt, _vehicle_land_detected.landed)) {
 				_failsafe_land_hysteresis.set_state_and_update(false, time_stamp_now);
 
 			} else {
@@ -437,7 +441,7 @@ void MulticopterPositionControl::Run()
 
 				_control.setInputSetpoint(failsafe_setpoint);
 				_control.setVelocityLimits(_param_mpc_xy_vel_max.get(), _param_mpc_z_vel_max_up.get(), _param_mpc_z_vel_max_dn.get());
-				_control.update(dt);
+				_control.update(dt, _vehicle_land_detected.landed);
 			}
 
 			// Publish internal position control setpoints

@@ -24,4 +24,4 @@
 
 set MIXER quad_x
 
-set PWM_OUT 1234
+set PWM_OUT 12345678

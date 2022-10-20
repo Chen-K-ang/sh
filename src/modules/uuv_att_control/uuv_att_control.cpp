@@ -172,6 +172,7 @@ void UUVAttitudeControl::control_attitude_geo(const vehicle_attitude_s &attitude
 	float pitch_rate_desired = rates_setpoint.pitch;
 	float yaw_rate_desired = rates_setpoint.yaw;
 
+
 	/* get attitude setpoint rotational matrix */
 	Dcmf rot_des = Eulerf(roll_body, pitch_body, yaw_body);
 

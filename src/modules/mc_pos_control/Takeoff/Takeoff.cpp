@@ -109,7 +109,7 @@ void Takeoff::updateTakeoffState(const bool armed, const bool landed, const bool
 	}
 }
 
-float Takeoff::updateRamp(const float dt, const float takeoff_desired_vz)
+float Takeoff::updateRamp(const float dt, const float takeoff_desired_vz, const bool landed)
 {
 	float upwards_velocity_limit = takeoff_desired_vz;
 
@@ -127,6 +127,12 @@ float Takeoff::updateRamp(const float dt, const float takeoff_desired_vz)
 
 		if (_takeoff_ramp_progress < 1.f) {
 			upwards_velocity_limit = _takeoff_ramp_vz_init + _takeoff_ramp_progress * (takeoff_desired_vz - _takeoff_ramp_vz_init);
+		}
+
+		if(landed){
+			_takeoff_ramp_progress = 0.f;
+		}else{
+			_takeoff_ramp_progress = 1.f;
 		}
 	}
 
